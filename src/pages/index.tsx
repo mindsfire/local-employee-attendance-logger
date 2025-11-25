@@ -1,78 +1,151 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useState, useEffect } from 'react';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+type AttendanceRecord = {
+  id: string;
+  name: string;
+  loginTime: Date;
+  logoutTime: Date | null;
+};
 
 export default function Home() {
+  const [name, setName] = useState('');
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Load records from localStorage on component mount
+  useEffect(() => {
+    const savedRecords = localStorage.getItem('attendanceRecords');
+    if (savedRecords) {
+      const parsedRecords = JSON.parse(savedRecords);
+      setRecords(parsedRecords.map((record: any) => ({
+        ...record,
+        loginTime: new Date(record.loginTime),
+        logoutTime: record.logoutTime ? new Date(record.logoutTime) : null
+      })));
+      
+      // Check if there's an active session
+      const activeSession = parsedRecords.find((r: any) => !r.logoutTime);
+      if (activeSession) {
+        setCurrentSessionId(activeSession.id);
+      }
+    }
+  }, []);
+
+  // Save records to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('attendanceRecords', JSON.stringify(records));
+  }, [records]);
+
+  const handleClockIn = () => {
+    if (!name.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+    
+    if (currentSessionId) {
+      alert('You are already clocked in!');
+      return;
+    }
+
+    const newRecord: AttendanceRecord = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      loginTime: new Date(),
+      logoutTime: null
+    };
+
+    setRecords([...records, newRecord]);
+    setCurrentSessionId(newRecord.id);
+  };
+
+  const handleClockOut = () => {
+    if (!currentSessionId) {
+      alert('You are not clocked in!');
+      return;
+    }
+
+    setRecords(records.map(record => 
+      record.id === currentSessionId 
+        ? { ...record, logoutTime: new Date() } 
+        : record
+    ));
+    
+    setCurrentSessionId(null);
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return 'In Progress';
+    return date.toLocaleString();
+  };
+
+  const calculateDuration = (start: Date, end: Date | null) => {
+    if (!end) return 'In Progress';
+    const diff = end.getTime() - start.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+      <h1>Employee Attendance Logger</h1>
+      
+      <div style={{ margin: '20px 0', padding: '20px', border: '1px solid #ddd' }}>
+        <h2>{currentSessionId ? 'Clock Out' : 'Clock In'}</h2>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter your name"
+          disabled={!!currentSessionId}
+          style={{ padding: '8px', marginRight: '10px', width: '200px' }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {currentSessionId ? (
+          <button 
+            onClick={handleClockOut}
+            style={{ padding: '8px 16px', backgroundColor: '#f44336', color: 'white', border: 'none', cursor: 'pointer' }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Clock Out
+          </button>
+        ) : (
+          <button 
+            onClick={handleClockIn}
+            style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', cursor: 'pointer' }}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
+            Clock In
+          </button>
+        )}
+      </div>
+
+      <div style={{ marginTop: '40px' }}>
+        <h2>Attendance Records</h2>
+        {records.length === 0 ? (
+          <p>No records found</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f2f2f2' }}>
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Name</th>
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Login Time</th>
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Logout Time</th>
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...records].reverse().map((record) => (
+                <tr key={record.id} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{record.name}</td>
+                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(record.loginTime)}</td>
+                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(record.logoutTime)}</td>
+                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                    {calculateDuration(record.loginTime, record.logoutTime)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
