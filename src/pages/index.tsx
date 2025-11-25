@@ -13,6 +13,7 @@ export default function Home() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Load records from localStorage on component mount
   useEffect(() => {
@@ -128,9 +129,15 @@ export default function Home() {
     }
   };
 
+  // Filter records based on search term
+  const filteredRecords = records.filter(record => 
+    record.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const exportToCSV = () => {
     try {
-      if (records.length === 0) {
+      const recordsToExport = searchTerm ? filteredRecords : records;
+      if (recordsToExport.length === 0) {
         setError('No records to export');
         return;
       }
@@ -139,7 +146,7 @@ export default function Home() {
       let csvContent = 'Name,Login Time,Logout Time,Duration\n';
       
       // Add each record as a row in the CSV
-      records.forEach(record => {
+      recordsToExport.forEach(record => {
         const loginTime = formatDate(record.loginTime);
         const logoutTime = formatDate(record.logoutTime);
         const duration = calculateDuration(record.loginTime, record.logoutTime);
@@ -286,9 +293,10 @@ export default function Home() {
       </div>
 
       <div style={{ marginTop: '40px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Attendance Records</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h2>Attendance Records</h2>
+            <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               onClick={exportToCSV}
               style={{ 
@@ -321,10 +329,38 @@ export default function Home() {
             >
               <span>🗑️</span> Clear All
             </button>
+            </div>
+          </div>
+          
+          {/* Search Filter */}
+          <div style={{ marginBottom: '15px' }}>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name..."
+              style={{
+                padding: '8px 12px',
+                width: '100%',
+                maxWidth: '300px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+            />
+            {searchTerm && (
+              <span style={{ 
+                marginLeft: '10px', 
+                color: '#666',
+                fontSize: '14px'
+              }}>
+                Showing {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         </div>
         
-        {records.length === 0 ? (
+        {filteredRecords.length === 0 ? (
           <p>No records found</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -338,7 +374,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {[...records].reverse().map((record) => (
+                {[...filteredRecords].reverse().map((record) => (
                   <tr 
                     key={record.id} 
                     style={{ 
