@@ -4,6 +4,8 @@ export type User = {
   id: string;
   employeeId: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   role: 'admin' | 'employee';
 };
 
@@ -32,6 +34,8 @@ export const DEFAULT_ACCOUNTS: MockAccount[] = [
     id: '1',
     employeeId: 'admin',
     name: 'Admin User',
+    firstName: 'Admin',
+    lastName: 'User',
     role: 'admin',
     password: 'Admin@123',
     email: 'admin@example.com',
@@ -117,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const allAccounts = getAllAccounts();
       console.log('All accounts:', allAccounts);
       console.log('Looking for employee ID:', normalizedId);
-      
+
       const account = allAccounts.find(
         (acc: MockAccount) => acc.employeeId.toLowerCase() === normalizedId
       );
@@ -152,9 +156,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      return { 
-        success: false, 
-        error: 'Invalid credentials. Please try again.' 
+      return {
+        success: false,
+        error: 'Invalid credentials. Please try again.'
       };
     }
   };
