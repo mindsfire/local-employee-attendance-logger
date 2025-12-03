@@ -26,7 +26,7 @@ export default function Layout({ children }: LayoutProps) {
             <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
             {/* Main Content */}
-            <main className="pt-16 lg:pl-64 transition-all duration-300">
+            <main className={`pt-16 transition-all duration-300 ${sidebarOpen ? 'lg:pl-64' : ''}`}>
                 <div className="p-4 sm:p-6 lg:p-8">
                     {children}
                 </div>

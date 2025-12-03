@@ -34,6 +34,8 @@ const StatusBadge = ({ status }: { status: string }) => {
         return { ...baseStyle, backgroundColor: '#fee2e2', color: '#991b1b' };
       case 'Early Leave':
         return { ...baseStyle, backgroundColor: '#fef3c7', color: '#92400e' };
+      case 'Good Entry':
+      case 'Good Exit':
       case 'Ok Entry':
       case 'Ok Exit':
         return { ...baseStyle, backgroundColor: '#d1fae5', color: '#065f46' };
@@ -66,23 +68,31 @@ const getStatus = (loginTime: Date, logoutTime: Date | null): string[] => {
   let status: string[] = [];
 
   // Entry Logic
-  if (loginHour < OFFICE_START_HOUR) {
+  // Before 9:30 AM = Early Entry
+  // 9:30 AM - 10:00 AM = Good Entry
+  // After 10:00 AM = Late
+  if (loginHour < 9 || (loginHour === 9 && loginMinute < 30)) {
     status.push('Early Entry');
+  } else if (loginHour === 9 && loginMinute >= 30) {
+    status.push('Good Entry');
   } else if (loginHour === OFFICE_START_HOUR && loginMinute <= GRACE_PERIOD_MINUTES) {
-    status.push('Ok Entry');
+    status.push('Good Entry');
   } else {
     status.push('Late');
   }
 
   // Exit Logic
+  // Before 7:00 PM = Early Leave
+  // 7:00 PM - 7:30 PM = Good Exit
+  // 7:30 PM - 11:59 PM = Overtime
   if (logoutTime) {
     const logoutHour = logoutTime.getHours();
     const logoutMinute = logoutTime.getMinutes();
 
     if (logoutHour < OFFICE_END_HOUR) {
       status.push('Early Leave');
-    } else if (logoutHour === OFFICE_END_HOUR && logoutMinute <= GRACE_PERIOD_MINUTES) {
-      status.push('Ok Exit');
+    } else if (logoutHour === OFFICE_END_HOUR && logoutMinute <= 30) {
+      status.push('Good Exit');
     } else {
       status.push('Overtime');
     }
@@ -105,12 +115,14 @@ type ComplianceWarning = {
 };
 
 const checkAttendanceCompliance = (userRecords: AttendanceRecord[], userName: string): ComplianceWarning[] => {
-  const warnings: ComplianceWarning[] = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const sevenDaysAgo = new Date(today);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  // Collect all issues
+  const issues: string[] = [];
 
   // Check for unclosed sessions from previous days
   const unclosedOldSessions = userRecords.filter(record => {
@@ -121,12 +133,7 @@ const checkAttendanceCompliance = (userRecords: AttendanceRecord[], userName: st
   });
 
   if (unclosedOldSessions.length > 0) {
-    const oldestSession = unclosedOldSessions[0];
-    const sessionDate = oldestSession.loginTime.toLocaleDateString();
-    warnings.push({
-      type: 'unclosed_session',
-      message: `Hi ${userName}, you have an unclosed session from ${sessionDate}. Please ensure you clock out daily.`
-    });
+    issues.push(`${unclosedOldSessions.length} unclosed session(s)`);
   }
 
   // Check for excessive late entries in the last 7 days
@@ -137,10 +144,7 @@ const checkAttendanceCompliance = (userRecords: AttendanceRecord[], userName: st
   }).length;
 
   if (lateCount >= 3) {
-    warnings.push({
-      type: 'excessive_late',
-      message: `Hi ${userName}, you have been late ${lateCount} times in the last week. Please maintain punctuality.`
-    });
+    issues.push(`late ${lateCount} times this week`);
   }
 
   // Check for excessive early leaves in the last 7 days
@@ -150,13 +154,19 @@ const checkAttendanceCompliance = (userRecords: AttendanceRecord[], userName: st
   }).length;
 
   if (earlyLeaveCount >= 3) {
-    warnings.push({
-      type: 'excessive_early_leave',
-      message: `Hi ${userName}, you have left early ${earlyLeaveCount} times in the last week. Please complete your work hours.`
-    });
+    issues.push(`left early ${earlyLeaveCount} times this week`);
   }
 
-  return warnings;
+  // Combine all issues into one message
+  if (issues.length > 0) {
+    const message = `Hi ${userName}, you have ${issues.join(', ')} - please maintain proper attendance.`;
+    return [{
+      type: 'excessive_late',
+      message
+    }];
+  }
+
+  return [];
 };
 
 // Warning Banner Component
@@ -243,8 +253,30 @@ export default function Home() {
             logoutTime: record.logoutTime ? new Date(record.logoutTime) : null
           }));
 
-          // Check for active session
-          const activeSession = formattedRecords.find((r: any) => !r.logoutTime);
+          // Auto-close unclosed sessions from previous days
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          let hasAutoClosedSessions = false;
+          const autoClosedRecords = formattedRecords.map((record: AttendanceRecord) => {
+            // If session is unclosed and from a previous day
+            if (!record.logoutTime) {
+              const loginDate = new Date(record.loginTime);
+              loginDate.setHours(0, 0, 0, 0);
+
+              if (loginDate < today) {
+                // Auto-close at 11:59:59 PM of the login day
+                const autoLogoutTime = new Date(record.loginTime);
+                autoLogoutTime.setHours(23, 59, 59, 999);
+                hasAutoClosedSessions = true;
+                return { ...record, logoutTime: autoLogoutTime };
+              }
+            }
+            return record;
+          });
+
+          // Check for active session (only from today)
+          const activeSession = autoClosedRecords.find((r: any) => !r.logoutTime);
           if (activeSession) {
             setCurrentSessionId(activeSession.id);
           }
@@ -253,12 +285,15 @@ export default function Home() {
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
 
-          const validRecords = formattedRecords.filter((record: AttendanceRecord) => {
+          const validRecords = autoClosedRecords.filter((record: AttendanceRecord) => {
             return record.loginTime > cutoffDate;
           });
 
-          if (validRecords.length !== formattedRecords.length) {
+          if (validRecords.length !== formattedRecords.length || hasAutoClosedSessions) {
             console.log(`Cleaned up ${formattedRecords.length - validRecords.length} old records.`);
+            if (hasAutoClosedSessions) {
+              console.log('Auto-closed unclosed sessions from previous days.');
+            }
             setRecords(validRecords);
             localStorage.setItem('attendanceRecords', JSON.stringify(validRecords));
           } else {
@@ -386,9 +421,12 @@ export default function Home() {
   // Filter records for current user only
   const userRecords = records.filter(record => record.name === userName);
 
+  // Determine which records to display based on role
+  const displayRecords = user?.role === 'admin' ? records : userRecords;
+
   const exportToCSV = () => {
     try {
-      if (records.length === 0) {
+      if (displayRecords.length === 0) {
         setError('No records to export');
         return;
       }
@@ -397,7 +435,7 @@ export default function Home() {
       let csvContent = 'Name,Login Time,Logout Time,Duration\n';
 
       // Add each record as a row in the CSV
-      records.forEach(record => {
+      displayRecords.forEach(record => {
         const loginTime = formatDate(record.loginTime);
         const logoutTime = formatDate(record.logoutTime);
         const duration = calculateDuration(record.loginTime, record.logoutTime);
@@ -461,7 +499,7 @@ export default function Home() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh'
+        height: 'calc(100vh - 64px)'
       }}>
         <div>Loading attendance records...</div>
       </div>
@@ -564,7 +602,7 @@ export default function Home() {
           </div>
         </div>
 
-        {records.length === 0 ? (
+        {displayRecords.length === 0 ? (
           <p>No records found</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -578,7 +616,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {[...records].reverse().map((record) => (
+                {[...displayRecords].reverse().map((record) => (
                   <tr
                     key={record.id}
                     style={{
