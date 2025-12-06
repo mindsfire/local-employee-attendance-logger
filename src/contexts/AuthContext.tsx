@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 export type User = {
   id: string;
@@ -61,15 +62,36 @@ export const loadCustomAccounts = (): MockAccount[] => {
   }
 };
 
-export const getAllAccounts = (): MockAccount[] => {
-  const byEmployeeId = new Map<string, MockAccount>();
-  DEFAULT_ACCOUNTS.forEach(account => {
-    byEmployeeId.set(account.employeeId.toLowerCase(), account);
-  });
-  loadCustomAccounts().forEach(account => {
-    byEmployeeId.set(account.employeeId.toLowerCase(), account);
-  });
-  return Array.from(byEmployeeId.values());
+export const getAllAccounts = async (): Promise<MockAccount[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching employees from Supabase:', error);
+      return [];
+    }
+
+    // Map Supabase schema to MockAccount type
+    return (data || []).map((emp: any) => ({
+      id: emp.id,
+      employeeId: emp.employee_id,
+      name: emp.full_name,
+      firstName: emp.first_name,
+      lastName: emp.last_name,
+      role: emp.role as 'admin' | 'employee',
+      password: emp.password,
+      email: emp.email,
+      department: emp.department,
+      joiningDate: emp.joining_date,
+      status: emp.status as 'active' | 'inactive'
+    }));
+  } catch (error) {
+    console.error('Unexpected error fetching employees:', error);
+    return [];
+  }
 };
 
 export const saveCustomAccounts = (accounts: MockAccount[]) => {
@@ -77,21 +99,67 @@ export const saveCustomAccounts = (accounts: MockAccount[]) => {
   localStorage.setItem(CUSTOM_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 };
 
-export const upsertCustomAccount = (account: MockAccount) => {
-  const existing = loadCustomAccounts();
-  const normalizedId = account.employeeId.toLowerCase();
-  const next = existing.filter(acc => acc.employeeId.toLowerCase() !== normalizedId);
-  next.push(account);
-  saveCustomAccounts(next);
+export const upsertCustomAccount = async (account: MockAccount): Promise<void> => {
+  try {
+    // Normalize employee_id to lowercase for consistent querying
+    const normalizedEmployeeId = account.employeeId.trim().toLowerCase();
+
+    // Check if employee exists by employee_id
+    const { data: existing } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('employee_id', normalizedEmployeeId)
+      .single();
+
+    const employeeData = {
+      employee_id: normalizedEmployeeId,  // Store in lowercase
+      first_name: account.firstName || '',
+      last_name: account.lastName || '',
+      full_name: account.name,
+      role: account.role,
+      department: account.department || null,
+      email: account.email || null,
+      joining_date: account.joiningDate || null,
+      status: account.status || 'active',
+      password: account.password
+    };
+
+    if (existing) {
+      // Update existing employee
+      const { error } = await supabase
+        .from('employees')
+        .update(employeeData)
+        .eq('id', existing.id);
+
+      if (error) throw error;
+    } else {
+      // Insert new employee
+      const { error } = await supabase
+        .from('employees')
+        .insert([employeeData]);
+
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Error upserting employee:', error);
+    throw error;
+  }
 };
 
-export const removeCustomAccounts = (employeeIds: string[]) => {
+export const removeCustomAccounts = async (employeeIds: string[]): Promise<void> => {
   if (employeeIds.length === 0) return;
-  const targets = new Set(employeeIds);
-  const remaining = loadCustomAccounts().filter(
-    acc => !targets.has(acc.id)
-  );
-  saveCustomAccounts(remaining);
+
+  try {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .in('id', employeeIds);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting employees:', error);
+    throw error;
+  }
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -114,30 +182,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (employeeId: string, password: string) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       const normalizedId = employeeId.trim().toLowerCase();
-      const allAccounts = getAllAccounts();
-      console.log('All accounts:', allAccounts);
-      console.log('Looking for employee ID:', normalizedId);
 
-      const account = allAccounts.find(
-        (acc: MockAccount) => acc.employeeId.toLowerCase() === normalizedId
-      );
+      // Query Supabase for the employee (case-insensitive)
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employee_id', normalizedId)
+        .single();
 
-      console.log('Found account:', account);
-
-      if (!account) {
+      if (error || !data) {
+        console.log('Employee not found:', normalizedId, 'Error:', error);
         return {
           success: false,
           error: 'Employee ID not found. Please check with your administrator.'
         };
       }
 
-      console.log('Password check - provided:', password, 'stored:', account.password);
+      console.log('Found account:', data);
+      console.log('Password check - provided:', password, 'stored:', data.password);
 
-      if (account.password !== password) {
+      if (data.password !== password) {
         return {
           success: false,
           error: 'Incorrect password. Please try again.'
@@ -145,10 +210,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const authenticatedUser: User = {
-        id: account.id,
-        employeeId: account.employeeId,
-        name: account.name,
-        role: account.role
+        id: data.id,
+        employeeId: data.employee_id,
+        name: data.full_name,
+        role: data.role as 'admin' | 'employee'
       };
 
       setUser(authenticatedUser);
