@@ -23,6 +23,7 @@ type AuthContextType = {
   login: (employeeId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   loading: boolean;
+  testSupabaseConnection?: () => Promise<{ data?: any; error?: any }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,37 +65,28 @@ export const loadCustomAccounts = (): MockAccount[] => {
 
 export const getAllAccounts = async (): Promise<MockAccount[]> => {
   try {
-    // Query users_profile and join with admin_profile
     const { data, error } = await supabase
-      .schema('shared')
-      .from('users_profile')
-      .select(`
-        *,
-        admin_profile!inner(role, password)
-      `)
+      .schema('attendance')
+      .from('employees')
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching employees from Supabase:', error);
-      return [];
-    }
+    if (error) throw error;
 
-    // Map Supabase schema to MockAccount type
-    return (data || []).map((user: any) => ({
-      id: user.id,
-      employeeId: user.employee_id,
-      name: user.full_name,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.admin_profile?.role || 'employee',
-      password: user.admin_profile?.password || '',
-      email: user.email,
-      department: user.department,
-      joiningDate: user.joining_date,
-      status: user.status as 'active' | 'inactive'
-    }));
+    return data?.map(emp => ({
+      id: emp.employee_id,
+      employeeId: emp.employee_id,
+      name: emp.full_name || `${emp.first_name} ${emp.last_name || ''}`.trim(),
+      firstName: emp.first_name,
+      lastName: emp.last_name,
+      role: emp.role as 'admin' | 'employee',
+      password: emp.password || '',
+      department: emp.department || 'N/A',
+      email: emp.email || '',
+      status: emp.status || 'active'
+    })) || [];
   } catch (error) {
-    console.error('Unexpected error fetching employees:', error);
+    console.error('Error fetching employees:', error);
     return [];
   }
 };
@@ -108,82 +100,58 @@ export const upsertCustomAccount = async (account: MockAccount): Promise<void> =
   try {
     const normalizedEmployeeId = account.employeeId.trim().toLowerCase();
 
-    // Check if user exists
     const { data: existing } = await supabase
-      .schema('shared')
-      .from('users_profile')
+      .schema('attendance')
+      .from('employees')
       .select('id')
       .eq('employee_id', normalizedEmployeeId)
       .single();
 
-    const userData = {
+    const employeeData = {
       employee_id: normalizedEmployeeId,
       first_name: account.firstName || '',
       last_name: account.lastName || '',
       full_name: account.name,
-      email: account.email || null,
-      department: account.department || null,
-      joining_date: account.joiningDate || null,
-      status: account.status || 'active'
+      email: account.email,
+      department: account.department,
+      status: account.status || 'active',
+      password: account.password || 'defaultPassword123',
+      role: account.role === 'admin' ? 'admin' : 'employee',
     };
 
-    let userId = existing?.id;
-
     if (existing) {
-      // Update existing user
       const { error } = await supabase
-        .schema('shared')
-        .from('users_profile')
-        .update(userData)
+        .schema('attendance')
+        .from('employees')
+        .update(employeeData)
         .eq('id', existing.id);
 
       if (error) throw error;
     } else {
-      // Insert new user
-      const { data: newUser, error } = await supabase
-        .schema('shared')
-        .from('users_profile')
-        .insert([userData])
-        .select()
-        .single();
+      const { error } = await supabase
+        .schema('attendance')
+        .from('employees')
+        .insert([employeeData]);
 
       if (error) throw error;
-      userId = newUser.id;
     }
-
-    // Upsert admin_profile
-    const { error: adminError } = await supabase
-      .schema('shared')
-      .from('admin_profile')
-      .upsert({
-        user_id: userId,
-        role: account.role,
-        password: account.password
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (adminError) throw adminError;
   } catch (error) {
-    console.error('Error upserting employee:', error);
+    console.error('Error saving account:', error);
     throw error;
   }
 };
 
 export const removeCustomAccounts = async (employeeIds: string[]): Promise<void> => {
-  if (employeeIds.length === 0) return;
-
   try {
-    // Delete from users_profile (cascade will delete admin_profile)
     const { error } = await supabase
-      .schema('shared')
-      .from('users_profile')
+      .schema('attendance')
+      .from('employees')
       .delete()
-      .in('id', employeeIds);
+      .in('employee_id', employeeIds);
 
     if (error) throw error;
   } catch (error) {
-    console.error('Error deleting employees:', error);
+    console.error('Error removing accounts:', error);
     throw error;
   }
 };
@@ -209,17 +177,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (employeeId: string, password: string) => {
     try {
       const normalizedId = employeeId.trim().toLowerCase();
+      console.log('Attempting login with employee_id:', normalizedId);
 
-      // Query user and admin profile
+      // Query employee from employees table
       const { data, error } = await supabase
-        .schema('shared')
-        .from('users_profile')
-        .select(`
-          *,
-          admin_profile!inner(role, password)
-        `)
+        .schema('attendance')
+        .from('employees')
+        .select('*')
         .eq('employee_id', normalizedId)
         .single();
+
+      console.log('Supabase query result:', { data, error });
 
       if (error || !data) {
         console.log('Employee not found:', normalizedId, 'Error:', error);
@@ -229,9 +197,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      const storedPassword = data.admin_profile?.password;
+      console.log('Employee found:', data);
+      console.log('Stored password:', data.password);
+      console.log('Provided password:', password);
+
+      const storedPassword = data.password;
 
       if (!storedPassword || storedPassword !== password) {
+        console.log('Password mismatch');
         return {
           success: false,
           error: 'Incorrect password. Please try again.'
@@ -242,13 +215,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: data.id,
         employeeId: data.employee_id,
         name: data.full_name,
-        role: data.admin_profile?.role || 'employee'
+        role: data.role
       };
+
+      console.log('Login successful:', authenticatedUser);
 
       setUser(authenticatedUser);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authenticatedUser));
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       return {
         success: false,
@@ -262,8 +237,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  // Debug function to test Supabase connection
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('Testing Supabase connection...');
+      const { data, error } = await supabase
+        .schema('attendance')
+        .from('employees')
+        .select('employee_id, full_name, role')
+        .limit(5);
+      
+      console.log('Supabase test result:', { data, error });
+      return { data, error };
+    } catch (err) {
+      console.error('Supabase connection error:', err);
+      return { error: err };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, testSupabaseConnection }}>
       {children}
     </AuthContext.Provider>
   );

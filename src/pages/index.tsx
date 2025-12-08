@@ -234,8 +234,6 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-
-
   // Load records from Supabase on component mount
   useEffect(() => {
     const loadRecords = async () => {
@@ -250,28 +248,20 @@ export default function Home() {
 
         // Filter by employee if not admin
         if (user.role !== 'admin') {
-          query = query.eq('employee_id', user.id);
+          query = query.eq('employee_id', user.employeeId);  // Use employeeId not id
         }
 
         const { data, error } = await query;
 
         if (error) {
-          console.error('Error loading records from Supabase:', error);
-          setError('Failed to load attendance records.');
-          setIsLoading(false);
+          console.error('Error loading records:', error);
+          setError('Failed to load attendance records');
           return;
         }
 
-        if (!data) {
-          setRecords([]);
-          setIsLoading(false);
-          return;
-        }
-
-        // Convert Supabase data to AttendanceRecord format
-        const formattedRecords: AttendanceRecord[] = data.map((record: any) => ({
+        const formattedRecords = (data || []).map((record: any) => ({
           id: record.id,
-          name: record.employee_name,
+          name: userName, // Use current user's name since not stored in DB
           loginTime: new Date(record.login_time),
           logoutTime: record.logout_time ? new Date(record.logout_time) : null
         }));
@@ -364,25 +354,37 @@ export default function Home() {
     }
 
     try {
+      console.log('Clocking in with user:', user);
+      console.log('User ID (UUID):', user.id);
+      console.log('Employee ID (text):', user.employeeId);
+      console.log('User Name:', userName.trim());
+      
+      const attendanceData = {
+        employee_id: user.employeeId,  // Use employeeId (text) not id (UUID)
+        login_time: new Date().toISOString(),
+        logout_time: null
+      };
+      
+      console.log('Attendance data to insert:', attendanceData);
+      
       const { data, error } = await supabase
         .schema('attendance')
         .from('attendance_logs')
-        .insert([{
-          employee_id: user.id,
-          employee_code: user.employeeId,
-          employee_name: userName.trim(),
-          login_time: new Date().toISOString(),
-          logout_time: null
-        }])
+        .insert([attendanceData])
         .select()
         .single();
 
-      if (error) throw error;
+      console.log('Supabase response:', { data, error });
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
 
       if (data) {
         const newRecord: AttendanceRecord = {
           id: data.id,
-          name: data.employee_name,
+          name: userName, // Use current user's name
           loginTime: new Date(data.login_time),
           logoutTime: null
         };
@@ -450,8 +452,8 @@ export default function Home() {
         let query = supabase.schema('attendance').from('attendance_logs').delete();
 
         // If not admin, only delete own records
-        if (user?.role !== 'admin' && user?.id) {
-          query = query.eq('employee_id', user.id);
+        if (user?.role !== 'admin' && user?.employeeId) {
+          query = query.eq('employee_id', user.employeeId);  // Use employeeId not id
         } else {
           // For admin, delete all records
           query = query.neq('id', '00000000-0000-0000-0000-000000000000');
