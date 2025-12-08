@@ -243,6 +243,7 @@ export default function Home() {
 
       try {
         let query = supabase
+          .schema('attendance')
           .from('attendance_logs')
           .select('*')
           .order('login_time', { ascending: false });
@@ -364,6 +365,7 @@ export default function Home() {
 
     try {
       const { data, error } = await supabase
+        .schema('attendance')
         .from('attendance_logs')
         .insert([{
           employee_id: user.id,
@@ -404,6 +406,7 @@ export default function Home() {
 
     try {
       const { data, error } = await supabase
+        .schema('attendance')
         .from('attendance_logs')
         .update({ logout_time: new Date().toISOString() })
         .eq('id', currentSessionId)
@@ -444,7 +447,7 @@ export default function Home() {
 
     if (window.confirm(confirmMessage)) {
       try {
-        let query = supabase.from('attendance_logs').delete();
+        let query = supabase.schema('attendance').from('attendance_logs').delete();
 
         // If not admin, only delete own records
         if (user?.role !== 'admin' && user?.id) {

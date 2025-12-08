@@ -64,9 +64,14 @@ export const loadCustomAccounts = (): MockAccount[] => {
 
 export const getAllAccounts = async (): Promise<MockAccount[]> => {
   try {
+    // Query users_profile and join with admin_profile
     const { data, error } = await supabase
-      .from('employees')
-      .select('*')
+      .schema('shared')
+      .from('users_profile')
+      .select(`
+        *,
+        admin_profile!inner(role, password)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -75,18 +80,18 @@ export const getAllAccounts = async (): Promise<MockAccount[]> => {
     }
 
     // Map Supabase schema to MockAccount type
-    return (data || []).map((emp: any) => ({
-      id: emp.id,
-      employeeId: emp.employee_id,
-      name: emp.full_name,
-      firstName: emp.first_name,
-      lastName: emp.last_name,
-      role: emp.role as 'admin' | 'employee',
-      password: emp.password,
-      email: emp.email,
-      department: emp.department,
-      joiningDate: emp.joining_date,
-      status: emp.status as 'active' | 'inactive'
+    return (data || []).map((user: any) => ({
+      id: user.id,
+      employeeId: user.employee_id,
+      name: user.full_name,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.admin_profile?.role || 'employee',
+      password: user.admin_profile?.password || '',
+      email: user.email,
+      department: user.department,
+      joiningDate: user.joining_date,
+      status: user.status as 'active' | 'inactive'
     }));
   } catch (error) {
     console.error('Unexpected error fetching employees:', error);
@@ -101,45 +106,64 @@ export const saveCustomAccounts = (accounts: MockAccount[]) => {
 
 export const upsertCustomAccount = async (account: MockAccount): Promise<void> => {
   try {
-    // Normalize employee_id to lowercase for consistent querying
     const normalizedEmployeeId = account.employeeId.trim().toLowerCase();
 
-    // Check if employee exists by employee_id
+    // Check if user exists
     const { data: existing } = await supabase
-      .from('employees')
+      .schema('shared')
+      .from('users_profile')
       .select('id')
       .eq('employee_id', normalizedEmployeeId)
       .single();
 
-    const employeeData = {
-      employee_id: normalizedEmployeeId,  // Store in lowercase
+    const userData = {
+      employee_id: normalizedEmployeeId,
       first_name: account.firstName || '',
       last_name: account.lastName || '',
       full_name: account.name,
-      role: account.role,
-      department: account.department || null,
       email: account.email || null,
+      department: account.department || null,
       joining_date: account.joiningDate || null,
-      status: account.status || 'active',
-      password: account.password
+      status: account.status || 'active'
     };
 
+    let userId = existing?.id;
+
     if (existing) {
-      // Update existing employee
+      // Update existing user
       const { error } = await supabase
-        .from('employees')
-        .update(employeeData)
+        .schema('shared')
+        .from('users_profile')
+        .update(userData)
         .eq('id', existing.id);
 
       if (error) throw error;
     } else {
-      // Insert new employee
-      const { error } = await supabase
-        .from('employees')
-        .insert([employeeData]);
+      // Insert new user
+      const { data: newUser, error } = await supabase
+        .schema('shared')
+        .from('users_profile')
+        .insert([userData])
+        .select()
+        .single();
 
       if (error) throw error;
+      userId = newUser.id;
     }
+
+    // Upsert admin_profile
+    const { error: adminError } = await supabase
+      .schema('shared')
+      .from('admin_profile')
+      .upsert({
+        user_id: userId,
+        role: account.role,
+        password: account.password
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (adminError) throw adminError;
   } catch (error) {
     console.error('Error upserting employee:', error);
     throw error;
@@ -150,8 +174,10 @@ export const removeCustomAccounts = async (employeeIds: string[]): Promise<void>
   if (employeeIds.length === 0) return;
 
   try {
+    // Delete from users_profile (cascade will delete admin_profile)
     const { error } = await supabase
-      .from('employees')
+      .schema('shared')
+      .from('users_profile')
       .delete()
       .in('id', employeeIds);
 
@@ -184,10 +210,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const normalizedId = employeeId.trim().toLowerCase();
 
-      // Query Supabase for the employee (case-insensitive)
+      // Query user and admin profile
       const { data, error } = await supabase
-        .from('employees')
-        .select('*')
+        .schema('shared')
+        .from('users_profile')
+        .select(`
+          *,
+          admin_profile!inner(role, password)
+        `)
         .eq('employee_id', normalizedId)
         .single();
 
@@ -199,10 +229,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      console.log('Found account:', data);
-      console.log('Password check - provided:', password, 'stored:', data.password);
+      const storedPassword = data.admin_profile?.password;
 
-      if (data.password !== password) {
+      if (!storedPassword || storedPassword !== password) {
         return {
           success: false,
           error: 'Incorrect password. Please try again.'
@@ -213,7 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: data.id,
         employeeId: data.employee_id,
         name: data.full_name,
-        role: data.role as 'admin' | 'employee'
+        role: data.admin_profile?.role || 'employee'
       };
 
       setUser(authenticatedUser);
