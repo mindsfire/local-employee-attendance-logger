@@ -67,7 +67,7 @@ const getStatus = (loginTime: Date, logoutTime: Date | null): string[] => {
   const loginHour = loginTime.getHours();
   const loginMinute = loginTime.getMinutes();
 
-  let status: string[] = [];
+  const status: string[] = [];
 
   // Entry Logic
   // Before 9:30 AM = Early Entry
@@ -538,14 +538,8 @@ export default function Home() {
   // Filter records for current user only
   const userRecords = records.filter(record => record.employeeId === user?.employeeId);
 
-  // Show only today's records
-  const displayRecords: AttendanceRecord[] = records.filter(record => {
-    const recordDate = new Date(record.loginTime);
-    const today = new Date();
-    return recordDate.getDate() === today.getDate() &&
-      recordDate.getMonth() === today.getMonth() &&
-      recordDate.getFullYear() === today.getFullYear();
-  });
+  // Show all records (old behavior)
+  const displayRecords: AttendanceRecord[] = records;
 
   const exportToCSV = () => {
     try {

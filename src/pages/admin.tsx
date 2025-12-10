@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import {
   MockAccount,
@@ -67,7 +67,7 @@ export default function AdminDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formState, setFormState] = useState<EmployeeFormState>(initialFormState);
 
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
     try {
       const accounts = await getAllAccounts();
       setEmployees(accounts);
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
       console.error('Error loading employees:', error);
       setStatusMessage('Failed to load employees.');
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
     } else if (!loading && user?.role === 'admin') {
       loadEmployees();
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, loadEmployees]);
 
   const allVisibleSelected = useMemo(
     () => employees.length > 0 && selectedEmployeeIds.length === employees.length,
