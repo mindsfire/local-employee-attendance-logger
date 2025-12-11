@@ -258,7 +258,14 @@ export default function Home() {
           return;
         }
 
-        const formattedRecords = (data || []).map((record: any) => ({
+        interface DatabaseRecord {
+  id: string;
+  employee_id: string;
+  login_time: string;
+  logout_time: string | null;
+}
+
+        const formattedRecords = (data || []).map((record: DatabaseRecord) => ({
           id: record.id,
           name: userName, // Temporary, will be updated below
           employeeId: record.employee_id, // Store employee_id for proper filtering
@@ -325,7 +332,7 @@ export default function Home() {
           hasLogout: !!r.logoutTime
         })));
 
-        const activeSession = autoClosedRecords.find((r: any) => {
+        const activeSession = autoClosedRecords.find((r: AttendanceRecord) => {
           if (!r.logoutTime) {
             const recordDate = new Date(r.loginTime);
             recordDate.setHours(0, 0, 0, 0);
