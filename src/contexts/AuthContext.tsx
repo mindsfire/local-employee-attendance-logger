@@ -19,6 +19,20 @@ export type MockAccount = User & {
   status?: 'active' | 'inactive';
 };
 
+type DatabaseEmployee = {
+  id: string;
+  email: string;
+  full_name: string;
+  first_name?: string;
+  last_name?: string;
+  role: string;
+  department?: string;
+  password?: string;
+  status?: string;
+  joining_date?: string | Date;
+  created_at?: string;
+};
+
 type AuthContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -56,7 +70,7 @@ export const getAllAccounts = async (): Promise<MockAccount[]> => {
 
     if (error) throw error;
 
-    return data?.map((emp: any) => {
+    return data?.map((emp: DatabaseEmployee) => {
       let formattedJoiningDate = '';
       if (emp.joining_date) {
         try {
