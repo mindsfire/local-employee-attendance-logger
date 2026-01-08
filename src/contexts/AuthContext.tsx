@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { createClient } from '../utils/supabase/client';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 export type User = {
   id: string;
@@ -55,7 +56,7 @@ export const getAllAccounts = async (): Promise<MockAccount[]> => {
 
     if (error) throw error;
 
-    return data?.map(emp => {
+    return data?.map((emp: any) => {
       let formattedJoiningDate = '';
       if (emp.joining_date) {
         try {
@@ -214,7 +215,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       console.log(`AuthContext: Auth event [${event}]`, session?.user?.email);
       if (session?.user?.email) {
         // First try to find existing employee
