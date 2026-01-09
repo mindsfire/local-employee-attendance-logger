@@ -9,15 +9,11 @@ interface StatsCardsProps {
 export default function StatsCards({ records, currentSessionId, userName }: StatsCardsProps) {
   // Calculate stats
   const userRecords = records.filter(record => record.name === userName);
-  
+
   // Today's stats
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayRecords = userRecords.filter(record => {
-    const recordDate = new Date(record.loginTime);
-    recordDate.setHours(0, 0, 0, 0);
-    return recordDate.getTime() === today.getTime();
-  });
+  // todayRecords filtered but not currently used in summary
 
   // This week stats (last 7 days)
   const weekAgo = new Date();
@@ -134,7 +130,7 @@ export default function StatsCards({ records, currentSessionId, userName }: Stat
           </svg>
         </div>
         <div className="text-2xl font-bold text-gray-900">
-          {monthRecords.length > 0 
+          {monthRecords.length > 0
             ? Math.round(((monthRecords.length - countLateArrivals(monthRecords)) / monthRecords.length) * 100)
             : 0}%
         </div>

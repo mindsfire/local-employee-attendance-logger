@@ -215,7 +215,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
               // Check if user needs to change password
               // Now that password_changed field exists, check its value
-              const needsPasswordChange = employee.role !== 'admin' && (!employee.password_changed || employee.password_changed === false);
+              const needsPasswordChange = !employee.password_changed || employee.password_changed === false;
 
               if (needsPasswordChange) {
                 setRequiresPasswordChange(true);
@@ -263,7 +263,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
 
           // Check if user needs to change password
-          const needsPasswordChange = employee.role !== 'admin' && (!employee.password_changed || employee.password_changed === false);
+          const needsPasswordChange = !employee.password_changed || employee.password_changed === false;
           setRequiresPasswordChange(needsPasswordChange);
         } else if (event === 'SIGNED_IN') {
           // Auto-create employee if doesn't exist
@@ -292,8 +292,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               department: newEmployee.department
             });
 
-            // New employees always need to change password (unless admin)
-            const needsPasswordChange = newEmployee.role !== 'admin';
+            // New employees always need to change password
+            const needsPasswordChange = true;
             setRequiresPasswordChange(needsPasswordChange);
           }
         }

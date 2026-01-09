@@ -29,14 +29,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Step 1: Get user IDs from Supabase Auth for the emails
         const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
-        
+
         if (authError) {
             console.error('Error fetching auth users:', authError)
             return res.status(500).json({ message: 'Failed to fetch auth users' })
         }
 
         // Find users to delete from Auth
-        const usersToDelete = authUsers.users.filter(user => 
+        const usersToDelete = authUsers.users.filter(user =>
             emails.includes(user.email || '')
         )
 
@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Step 4: Return results
         if (authDeleteErrors.length > 0) {
-            return res.status(207).json({ 
+            return res.status(207).json({
                 message: 'Employees deleted from database, but some auth users could not be deleted',
                 details: authDeleteErrors,
                 deletedFromDatabase: emails.length,
@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             message: 'Successfully deleted employees from both database and auth',
             deletedFromDatabase: emails.length,
             deletedFromAuth: usersToDelete.length

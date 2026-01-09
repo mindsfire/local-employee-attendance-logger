@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
-import Layout from '../components/Layout';
 import StatsCards from '../components/StatsCards';
 import { supabase } from '../lib/supabaseClient';
 
@@ -513,41 +512,6 @@ export default function Home() {
     }
   };
 
-  const clearAllData = async () => {
-    const confirmMessage = user?.role === 'admin'
-      ? '⚠️ WARNING: This will delete ALL attendance records for ALL employees. Are you sure?'
-      : '⚠️ WARNING: This will delete all YOUR attendance records. Are you sure?';
-
-    if (window.confirm(confirmMessage)) {
-      try {
-        let query = supabase.schema('attendance').from('attendance_logs').delete();
-
-        // If not admin, only delete own records
-        if (user?.role !== 'admin' && user?.email) {
-          query = query.eq('email', user.email);
-        } else {
-          // For admin, delete all records
-          query = query.neq('id', '00000000-0000-0000-0000-000000000000');
-        }
-
-        const { error } = await query;
-
-        if (error) throw error;
-
-        setRecords([]);
-        setCurrentSessionId(null);
-        setError('Attendance records have been cleared.');
-        // Clear the message after 3 seconds
-        setTimeout(() => setError(null), 3000);
-      } catch (error) {
-        console.error('Error clearing data:', error);
-        setError('Failed to clear attendance records.');
-      }
-    }
-  };
-
-  // Filter records for current user only
-  const userRecords = records.filter(record => record.email === user?.email);
 
   // Show all records sorted by latest first
   const displayRecords: AttendanceRecord[] = [...records].sort((a, b) => b.loginTime.getTime() - a.loginTime.getTime());
@@ -611,15 +575,7 @@ export default function Home() {
     return `${hours}h ${minutes}m`;
   };
 
-  const calculateTotalHours = (recordsToCalculate: AttendanceRecord[]) => {
-    return recordsToCalculate.reduce((total, record) => {
-      if (record.logoutTime) {
-        const diff = record.logoutTime.getTime() - record.loginTime.getTime();
-        return total + diff;
-      }
-      return total;
-    }, 0);
-  };
+
 
   if (isLoading) {
     return (

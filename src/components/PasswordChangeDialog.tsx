@@ -56,7 +56,7 @@ export default function PasswordChangeDialog({ isOpen, onClose, onSubmit }: Pass
       } else {
         setError(result.error || 'Failed to change password');
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
