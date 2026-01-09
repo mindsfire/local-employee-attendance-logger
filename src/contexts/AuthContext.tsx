@@ -35,7 +35,9 @@ type AuthContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   loading: boolean;
+  requiresPasswordChange: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,13 +151,22 @@ export const upsertCustomAccount = async (account: MockAccount): Promise<void> =
 
 export const removeCustomAccounts = async (emails: string[]): Promise<void> => {
   try {
-    const { error } = await supabase
-      .schema('attendance')
-      .from('employees')
-      .delete()
-      .in('email', emails); // Delete by email
+    // Use the new complete deletion API that deletes from both employees table and Supabase Auth
+    const response = await fetch('/api/admin/delete-employees', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ emails }),
+    });
 
-    if (error) throw error;
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to delete employees');
+    }
+
+    console.log('Delete response:', data);
   } catch (error) {
     console.error('Error removing accounts:', error);
     throw error;
@@ -165,23 +176,20 @@ export const removeCustomAccounts = async (emails: string[]): Promise<void> => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
     async function getSession() {
       try {
-        console.log('AuthContext: Initial session check...');
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
           console.error('AuthContext: Error getting session', error);
         }
 
-        console.log('AuthContext: Session retrieved:', session?.user?.email);
-
         if (session?.user?.email) {
-          console.log('AuthContext: Fetching employee details for', session.user.email);
           const { data: employee, error: dbError } = await supabase
             .schema('attendance')
             .from('employees')
@@ -195,7 +203,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (mounted) {
             if (employee) {
-              console.log('AuthContext: User found in DB', employee);
               setUser({
                 id: employee.id,
                 email: employee.email,
@@ -205,15 +212,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastName: employee.last_name,
                 department: employee.department
               });
+
+              // Check if user needs to change password
+              // Now that password_changed field exists, check its value
+              const needsPasswordChange = !employee.password_changed || employee.password_changed === false;
+
+              if (needsPasswordChange) {
+                setRequiresPasswordChange(true);
+              } else {
+                setRequiresPasswordChange(false);
+              }
             } else {
               if (mounted) {
-                console.warn('AuthContext: User authenticated but NOT found in matching employee table.');
                 setUser(null);
+                setRequiresPasswordChange(false);
               }
             }
           }
         } else {
-          console.log('AuthContext: No session found.');
           if (mounted) setUser(null);
         }
       } catch (error) {
@@ -226,7 +242,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      console.log(`AuthContext: Auth event [${event}]`, session?.user?.email);
       if (session?.user?.email) {
         // First try to find existing employee
         const { data: employee } = await supabase
@@ -237,7 +252,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (employee) {
-          console.log('AuthContext: AuthStateChange user set', employee.full_name);
           setUser({
             id: employee.id,
             email: employee.email,
@@ -247,9 +261,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             lastName: employee.last_name,
             department: employee.department
           });
+
+          // Check if user needs to change password
+          const needsPasswordChange = !employee.password_changed || employee.password_changed === false;
+          setRequiresPasswordChange(needsPasswordChange);
         } else if (event === 'SIGNED_IN') {
           // Auto-create employee if doesn't exist
-          console.log('AuthContext: Creating new employee for', session.user.email);
           const { data: newEmployee } = await supabase
             .schema('attendance')
             .from('employees')
@@ -265,7 +282,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             .single();
 
           if (newEmployee) {
-            console.log('AuthContext: New employee created', newEmployee.full_name);
             setUser({
               id: newEmployee.id,
               email: newEmployee.email,
@@ -275,11 +291,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               lastName: newEmployee.last_name,
               department: newEmployee.department
             });
+
+            // New employees always need to change password
+            const needsPasswordChange = true;
+            setRequiresPasswordChange(needsPasswordChange);
           }
         }
       } else {
-        console.log('AuthContext: AuthStateChange user null');
         setUser(null);
+        setRequiresPasswordChange(false);
       }
       setLoading(false);
     });
@@ -299,10 +319,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setRequiresPasswordChange(false);
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.message || 'Failed to change password' };
+      }
+
+      // Clear password change requirement after successful change
+      setRequiresPasswordChange(false);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Change password error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, changePassword, loading, requiresPasswordChange }}>
       {children}
     </AuthContext.Provider>
   );

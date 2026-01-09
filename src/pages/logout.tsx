@@ -1,12 +1,10 @@
 import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function Logout() {
     const { logout } = useAuth();
-    const router = useRouter();
 
     useEffect(() => {
         logout();

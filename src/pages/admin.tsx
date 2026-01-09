@@ -184,7 +184,17 @@ export default function AdminDashboard() {
         })
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data;
+
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response received:', text);
+        throw new Error(`Server returned unexpected format: ${text.slice(0, 100)}...`);
+      }
+
       if (!response.ok) throw new Error(data.message || 'Failed to create');
 
       await loadEmployees();

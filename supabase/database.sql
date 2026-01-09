@@ -20,6 +20,7 @@ CREATE TABLE attendance.employees (
   joining_date date,
   status text DEFAULT 'active',
   role text NOT NULL DEFAULT 'employee',
+  password_changed boolean DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 

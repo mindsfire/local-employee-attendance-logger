@@ -24,7 +24,6 @@ export default function Login() {
     register,
     handleSubmit,
     formState: { errors },
-    reset,
     setValue,
     watch
   } = useForm<LoginFormValues>({
