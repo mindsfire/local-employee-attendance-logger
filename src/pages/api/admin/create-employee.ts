@@ -30,7 +30,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     )
 
     try {
-        // 1. Create User in Supabase Auth
+        // 1. Check if user already exists in Supabase Auth
+        const { data: existingUser, error: checkError } = await supabaseAdmin.auth.admin.listUsers()
+        
+        if (checkError) {
+            console.error('Error checking existing users:', checkError)
+            return res.status(500).json({ message: 'Failed to check existing users' })
+        }
+
+        const userExists = existingUser.users.some(user => user.email === email)
+        
+        if (userExists) {
+            // User exists in Auth, check if they also exist in employees table
+            const { data: existingEmployee, error: employeeCheckError } = await supabaseAdmin
+                .schema('attendance')
+                .from('employees')
+                .select('email')
+                .eq('email', email)
+                .single()
+            
+            if (employeeCheckError && employeeCheckError.code !== 'PGRST116') {
+                console.error('Error checking existing employee:', employeeCheckError)
+                return res.status(500).json({ message: 'Failed to check existing employee' })
+            }
+            
+            if (existingEmployee) {
+                // User exists in both Auth and employees table
+                return res.status(400).json({ message: 'This user already exists in the system' })
+            }
+            
+            // User exists in Auth but not in employees table, add to employees table only
+            console.log('User exists in Auth, adding to employees table only')
+            
+            try {
+                const { error: dbError } = await supabaseAdmin
+                    .schema('attendance')
+                    .from('employees')
+                    .insert({
+                        email,
+                        full_name: fullName,
+                        role: role || 'employee',
+                        department: department || '',
+                        password_changed: false,
+                    })
+
+                if (dbError) {
+                    console.error('Database insert error:', dbError)
+                    
+                    // Check for specific constraint errors
+                    if (dbError.code === '23505' || dbError.message.includes('duplicate key')) {
+                        return res.status(400).json({ message: 'This user already exists in the system' })
+                    }
+                    
+                    return res.status(500).json({ message: dbError.message || 'Failed to create employee record' })
+                }
+
+                return res.status(200).json({ message: 'Employee record created successfully (user already existed)' })
+            } catch (insertError) {
+                console.error('Insert error:', insertError)
+                return res.status(500).json({ message: 'Failed to create employee record' })
+            }
+        }
+
+        // 2. Create User in Supabase Auth (only if doesn't exist)
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
@@ -41,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (authError) {
             // Handle specific error cases
             if (authError.message.includes('User already registered')) {
-                return res.status(400).json({ message: 'A user with this email address has already been registered' })
+                return res.status(400).json({ message: 'This user already exists in the system' })
             }
             throw authError
         }
@@ -56,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 full_name: fullName,
                 role: role || 'employee',
                 department: department || '',
-                // password: password, // removed storage as requested
+                password_changed: false, // New employees must change password
             })
 
         if (dbError) {
@@ -71,7 +133,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     } catch (error: unknown) {
         console.error('Error creating employee:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        return res.status(500).json({ message: errorMessage || 'Internal Server Error' })
+        
+        // Handle different types of errors
+        if (error instanceof Error) {
+            // Check for specific error messages
+            if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
+                return res.status(400).json({ message: 'This user already exists in the system' })
+            }
+            return res.status(500).json({ message: error.message || 'Internal Server Error' })
+        }
+        
+        return res.status(500).json({ message: 'An unexpected error occurred' })
     }
 }
