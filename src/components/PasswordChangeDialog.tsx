@@ -111,6 +111,20 @@ export default function PasswordChangeDialog({ isOpen, onClose, onSubmit, forceC
           )}
         </div>
 
+        {isForcedMode && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg shadow-sm">
+            <div className="flex gap-3">
+              <svg className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                Action Required: For your security, please change your temporary password.
+                Enter the temporary password you received, then create and confirm your new password below.
+              </p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
             {error}
