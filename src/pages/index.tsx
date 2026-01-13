@@ -4,6 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import StatsCards from '../components/StatsCards';
 import { supabase } from '../lib/supabaseClient';
 import { startOfDay, endOfDay, daysAgo } from '../utils/dateUtils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 export type AttendanceRecord = {
   id: string;
@@ -490,10 +493,19 @@ export default function Home() {
     }
 
     try {
+      // Find the session record to get loginTime
+      const session = records.find(r => r.id === currentSessionId);
+      const now = new Date();
+
+      if (session && now < session.loginTime) {
+        setError('Clock-out time cannot be earlier than clock-in time!');
+        return;
+      }
+
       const { data, error } = await supabase
         .schema('attendance')
         .from('attendance_logs')
-        .update({ logout_time: new Date().toISOString() })
+        .update({ logout_time: now.toISOString() })
         .eq('id', currentSessionId)
         .select()
         .single();
@@ -575,6 +587,66 @@ export default function Home() {
     }
   };
 
+  const exportToPDF = () => {
+    try {
+      if (displayRecords.length === 0) {
+        setError('No records to export');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("Attendance Report", 14, 20);
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+
+      const tableData = displayRecords.map(record => [
+        record.name,
+        formatDate(record.loginTime),
+        formatDate(record.logoutTime),
+        calculateDuration(record.loginTime, record.logoutTime)
+      ]);
+
+      autoTable(doc, {
+        head: [['Name', 'Login Time', 'Logout Time', 'Duration']],
+        body: tableData,
+        startY: 35,
+        theme: 'striped',
+        headStyles: { fillColor: [50, 50, 50] },
+      });
+
+      doc.save(`attendance_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      setError('Failed to export PDF.');
+    }
+  };
+
+  const exportToExcel = () => {
+    try {
+      if (displayRecords.length === 0) {
+        setError('No records to export');
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(displayRecords.map(record => ({
+        'Name': record.name,
+        'Login Time': formatDate(record.loginTime),
+        'Logout Time': formatDate(record.logoutTime),
+        'Duration': calculateDuration(record.loginTime, record.logoutTime)
+      })));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+
+      XLSX.writeFile(workbook, `attendance_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      setError('Failed to export Excel.');
+    }
+  };
+
   const formatDate = (date: Date | null) => {
     if (!date) return 'In Progress';
     return date.toLocaleString();
@@ -583,6 +655,7 @@ export default function Home() {
   const calculateDuration = (start: Date, end: Date | null) => {
     if (!end) return 'In Progress';
     const diff = end.getTime() - start.getTime();
+    if (diff < 0) return 'Invalid';
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
@@ -680,22 +753,56 @@ export default function Home() {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <h2>Attendance Records</h2>
-            <button
-              onClick={exportToCSV}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <span>📥</span> Export to CSV
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={exportToCSV}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <span>📄</span> CSV
+              </button>
+              <button
+                onClick={exportToExcel}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <span>📊</span> Excel
+              </button>
+              <button
+                onClick={exportToPDF}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <span>📕</span> PDF
+              </button>
+            </div>
           </div>
         </div>
 

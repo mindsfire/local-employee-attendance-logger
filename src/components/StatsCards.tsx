@@ -28,6 +28,8 @@ export default function StatsCards({ records, currentSessionId, userName }: Stat
     return records.reduce((total, record) => {
       if (record.logoutTime) {
         const diff = record.logoutTime.getTime() - record.loginTime.getTime();
+        // Ignore negative durations (corrupted data)
+        if (diff < 0) return total;
         return total + diff;
       }
       return total;
@@ -36,10 +38,14 @@ export default function StatsCards({ records, currentSessionId, userName }: Stat
 
   // Calculate average hours
   const calculateAverageHours = (records: AttendanceRecord[]) => {
-    const completedRecords = records.filter(r => r.logoutTime);
-    if (completedRecords.length === 0) return 0;
-    const totalMs = calculateTotalHours(completedRecords);
-    return totalMs / completedRecords.length;
+    const validRecords = records.filter(r => {
+      if (!r.logoutTime) return false;
+      return r.logoutTime.getTime() - r.loginTime.getTime() >= 0;
+    });
+
+    if (validRecords.length === 0) return 0;
+    const totalMs = calculateTotalHours(validRecords);
+    return totalMs / validRecords.length;
   };
 
   // Format hours
