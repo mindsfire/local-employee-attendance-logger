@@ -57,7 +57,9 @@ export default function AdminDashboard() {
   const [statusMessage, setStatusMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false); // This is the Form Modal (Add/Edit)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  // Removed isSaveModalOpen
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successModalMessage, setSuccessModalMessage] = useState('');
   const [formState, setFormState] = useState<EmployeeFormState>(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -162,17 +164,13 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.firstName.trim() || !formState.email.trim()) {
       setStatusMessage('First Name and Email are required.');
       return;
     }
-    // Open the confirmation modal instead of submitting directly
-    setIsSaveModalOpen(true);
-  };
 
-  const confirmSave = async () => {
     setIsSubmitting(true);
     setStatusMessage('Saving...');
     const fullName = `${formState.firstName.trim()} ${formState.lastName.trim()}`.trim();
@@ -204,14 +202,13 @@ export default function AdminDashboard() {
       if (!response.ok) throw new Error(data.message || 'Failed to create');
 
       await loadEmployees();
-      setStatusMessage(`Successfully saved ${fullName}.`);
-      setIsSaveModalOpen(false); // Close confirmation modal
+      setSuccessModalMessage(`Successfully saved ${fullName}.`);
       closeModal(); // Close form modal
+      setIsSuccessModalOpen(true); // Open success modal
     } catch (error: unknown) {
       console.error('Error saving:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setStatusMessage(`Failed: ${errorMessage}`);
-      setIsSaveModalOpen(false); // Close confirmation on error so they can try again or fix
     } finally {
       setIsSubmitting(false);
     }
@@ -227,7 +224,10 @@ export default function AdminDashboard() {
       await removeCustomAccounts(selectedEmails);
       setSelectedEmails([]);
       await loadEmployees();
-      setStatusMessage(`Removed ${selectedEmails.length} employees.`);
+      await loadEmployees();
+      setSuccessModalMessage(`Successfully removed ${selectedEmails.length} employees.`);
+      setIsDeleteModalOpen(false);
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error('Delete error:', error);
       setStatusMessage('Failed to delete.');
@@ -401,15 +401,17 @@ export default function AdminDashboard() {
         onCancel={() => setIsDeleteModalOpen(false)}
       />
 
+
+
       <ConfirmationModal
-        isOpen={isSaveModalOpen}
-        title="Save Employee"
-        message={`Are you sure you want to save the details for ${formState.firstName} ${formState.lastName}?`}
-        confirmText="Save"
-        cancelText="Edit"
+        isOpen={isSuccessModalOpen}
+        title="Success"
+        message={successModalMessage}
+        confirmText="OK"
+        cancelText={null}
         isDangerous={false}
-        onConfirm={confirmSave}
-        onCancel={() => setIsSaveModalOpen(false)}
+        onConfirm={() => setIsSuccessModalOpen(false)}
+        onCancel={() => setIsSuccessModalOpen(false)}
       />
     </>
   );

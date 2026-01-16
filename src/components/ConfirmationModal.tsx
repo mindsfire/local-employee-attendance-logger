@@ -5,7 +5,7 @@ interface ConfirmationModalProps {
     title: string;
     message: string;
     confirmText?: string;
-    cancelText?: string;
+    cancelText?: string | null;
     onConfirm: () => void;
     onCancel: () => void;
     isDangerous?: boolean; // If true, confirm button is red. false = blue/primary
@@ -77,13 +77,15 @@ export default function ConfirmationModal({
                         >
                             {confirmText}
                         </button>
-                        <button
-                            type="button"
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                            onClick={onCancel}
-                        >
-                            {cancelText}
-                        </button>
+                        {cancelText && (
+                            <button
+                                type="button"
+                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                onClick={onCancel}
+                            >
+                                {cancelText}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
