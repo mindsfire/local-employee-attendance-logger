@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Image from 'next/image';
 import { useState, Fragment, useEffect } from 'react';
 import PasswordChangeDialog from './PasswordChangeDialog';
+import Dropdown, { DropdownItem } from './Dropdown';
 
 interface NavbarProps {
     onMenuClick: () => void;
@@ -106,27 +107,47 @@ export default function Navbar({ onMenuClick, onLogoClick }: NavbarProps) {
                         {/* Right side - User info and Sign out */}
                         {user && (
                             <div className="flex items-center gap-4">
-                                <div className="hidden md:flex items-center gap-3">
+                                <div className="flex items-center gap-3">
                                     <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-500 text-white font-semibold text-sm">
                                         {getInitials(user.name)}
                                     </div>
-                                    <div className="text-right">
+                                    <div className="hidden md:block text-right">
                                         <p className="text-sm font-medium text-gray-900">{user.name}</p>
                                         <p className="text-xs text-gray-600 capitalize">{user.role}</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => router.push('/logout')}
-                                    className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 mr-2"
+                                <Dropdown
+                                    align="right"
+                                    trigger={
+                                        <button className="p-1 hover:bg-gray-100 rounded-lg transition-colors ml-1 text-gray-500">
+                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    }
                                 >
-                                    Sign Out
-                                </button>
-                                <button
-                                    onClick={() => setIsPasswordDialogOpen(true)}
-                                    className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-400"
-                                >
-                                    Change Password
-                                </button>
+                                    <DropdownItem
+                                        onClick={() => setIsPasswordDialogOpen(true)}
+                                        icon={
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                        }
+                                    >
+                                        Change Password
+                                    </DropdownItem>
+                                    <DropdownItem
+                                        onClick={() => router.push('/logout')}
+                                        icon={
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                            </svg>
+                                        }
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                        Sign Out
+                                    </DropdownItem>
+                                </Dropdown>
                             </div>
                         )}
                     </div>
