@@ -44,6 +44,16 @@ export default function Layout({ children, onLogoClick }: LayoutProps) {
         router.push('/');
     };
 
+    const breadcrumbs = router.pathname === '/admin'
+        ? [
+            { label: 'Dashboard', href: '/' },
+            { label: 'User Management' },
+        ]
+        : [
+            { label: 'Dashboard', href: '/' },
+            { label: 'Attendance' },
+        ];
+
     return (
         <SidebarProvider>
             <AppSidebar
@@ -54,7 +64,7 @@ export default function Layout({ children, onLogoClick }: LayoutProps) {
             />
             <SidebarInset>
                 <SiteHeader
-                    title="Mindsfire Employees"
+                    breadcrumbs={breadcrumbs}
                     user={user ? { name: user.name, email: user.email } : null}
                     onLogout={handleLogout}
                     onChangePassword={() => setIsPasswordDialogOpen(true)}

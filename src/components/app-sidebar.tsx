@@ -2,7 +2,11 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  UsersIcon,
+  BarChart3,
+  CalendarDays,
+  LayoutDashboard,
+  Users,
+  Wallet,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -12,6 +16,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarRail,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -31,30 +36,35 @@ export function AppSidebar({
 }) {
   const { user } = useAuth()
 
-  const navMain = [
+  const navGroups = [
     {
-      title: "Attendance Records",
-      url: "/",
-      icon: UsersIcon,
+      title: "Main",
+      items: [
+        { title: "Dashboard", url: "/", icon: LayoutDashboard },
+        { title: "Attendance", url: "/", icon: CalendarDays },
+        { title: "Leave", url: "/", icon: CalendarDays },
+        { title: "Payroll", url: "/", icon: Wallet },
+        { title: "Reports", url: "/", icon: BarChart3 },
+      ],
+    },
+    {
+      title: "Administration",
+      items: [{ title: "User Management", url: "/admin", icon: Users }],
     },
   ]
 
-  if (user?.role === "admin") {
-    navMain.push({
-      title: "Admin Panel",
-      url: "/admin",
-      icon: UsersIcon,
-    })
+  if (user?.role !== "admin") {
+    navGroups[1].items = []
   }
 
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:!p-1.5 group-data-[collapsible=icon]/sidebar-wrapper:!size-auto group-data-[collapsible=icon]/sidebar-wrapper:!p-0.5"
             >
               <Link href="/" onClick={() => onLogoClick?.()}>
                 <Image
@@ -62,17 +72,22 @@ export function AppSidebar({
                   alt="Mindsfire"
                   width={20}
                   height={20}
-                  className="object-contain"
+                  className="object-contain !h-7 !w-7 group-data-[collapsible=icon]/sidebar-wrapper:!h-7 group-data-[collapsible=icon]/sidebar-wrapper:!w-7"
                   priority
                 />
-                <span className="text-base font-semibold">Mindsfire</span>
+                <span className="flex flex-col leading-none group-data-[collapsible=icon]/sidebar-wrapper:hidden">
+                  <span className="text-xl font-semibold">mindsfire</span>
+                  <span className="-mt-1 text-[8px] font-normal text-muted-foreground">
+                    Employees
+                  </span>
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain groups={navGroups.filter((group) => group.items.length > 0)} />
       </SidebarContent>
       <SidebarFooter>
         {user && (
@@ -83,6 +98,7 @@ export function AppSidebar({
           />
         )}
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   )
 }

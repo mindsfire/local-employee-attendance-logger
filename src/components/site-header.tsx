@@ -1,10 +1,17 @@
-import Image from "next/image"
 import Link from "next/link"
 
 import { LogOutIcon, LockIcon } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,13 +24,13 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 export function SiteHeader({
-  title,
+  breadcrumbs,
   user,
   onLogout,
   onChangePassword,
   onLogoClick,
 }: {
-  title: string
+  breadcrumbs: { label: string; href?: string }[]
   user: { name: string; email: string } | null
   onLogout: () => void
   onChangePassword: () => void
@@ -43,21 +50,30 @@ export function SiteHeader({
       <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="data-[orientation=vertical]:h-4" />
-        <Link
-          href="/"
-          className="flex items-center gap-2"
-          onClick={() => onLogoClick()}
-        >
-          <Image
-            src="/logo-only.svg"
-            alt="Mindsfire"
-            width={28}
-            height={28}
-            className="object-contain"
-            priority
-          />
-          <h1 className="text-base font-medium">{title}</h1>
-        </Link>
+        <Breadcrumb>
+          <BreadcrumbList>
+            {breadcrumbs.map((crumb, index) => {
+              const isLast = index === breadcrumbs.length - 1
+
+              return (
+                <BreadcrumbItem key={`${crumb.label}-${index}`}>
+                  {isLast ? (
+                    <BreadcrumbPage className="text-sm font-medium text-foreground">
+                      {crumb.label}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild className="text-sm font-medium">
+                      <Link href={crumb.href ?? "/"} onClick={() => onLogoClick()}>
+                        {crumb.label}
+                      </Link>
+                    </BreadcrumbLink>
+                  )}
+                  {!isLast && <BreadcrumbSeparator />}
+                </BreadcrumbItem>
+              )
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <div className="ml-auto flex items-center">
           {user && (
