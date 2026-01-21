@@ -1,13 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
-import StatsCards from '../components/StatsCards';
+import { SectionCards } from '@/components/section-cards';
+import { AttendanceDataTable } from '@/components/attendance-data-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '../lib/supabaseClient';
-import { startOfDay, endOfDay, daysAgo } from '../utils/dateUtils';
+import { startOfDay, endOfDay, daysAgo, startOfMonth } from '../utils/dateUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import Dropdown, { DropdownItem } from '../components/Dropdown';
+import {
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  Table2,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export type AttendanceRecord = {
   id: string;
@@ -224,6 +243,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [complianceWarnings, setComplianceWarnings] = useState<ComplianceWarning[]>([]);
+  const [rangeFilter, setRangeFilter] = useState<'last7' | 'month' | 'last3'>('last7');
 
   // Use logged-in user's name
   const userName = user?.name || '';
@@ -542,9 +562,19 @@ export default function Home() {
   // Show all records sorted by latest first
   const displayRecords: AttendanceRecord[] = [...records].sort((a, b) => b.loginTime.getTime() - a.loginTime.getTime());
 
+  const filteredRecords = displayRecords.filter((record) => {
+    if (rangeFilter === 'last7') {
+      return record.loginTime >= daysAgo(7);
+    }
+    if (rangeFilter === 'month') {
+      return record.loginTime >= startOfMonth();
+    }
+    return record.loginTime >= daysAgo(90);
+  });
+
   const exportToCSV = () => {
     try {
-      if (displayRecords.length === 0) {
+      if (filteredRecords.length === 0) {
         setError('No records to export');
         return;
       }
@@ -553,7 +583,7 @@ export default function Home() {
       let csvContent = 'Name,Login Time,Logout Time,Duration\n';
 
       // Add each record as a row in the CSV
-      displayRecords.forEach(record => {
+      filteredRecords.forEach(record => {
         const loginTime = formatDate(record.loginTime);
         const logoutTime = formatDate(record.logoutTime);
         const duration = calculateDuration(record.loginTime, record.logoutTime);
@@ -590,7 +620,7 @@ export default function Home() {
 
   const exportToPDF = () => {
     try {
-      if (displayRecords.length === 0) {
+      if (filteredRecords.length === 0) {
         setError('No records to export');
         return;
       }
@@ -602,7 +632,7 @@ export default function Home() {
       doc.setTextColor(100);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
 
-      const tableData = displayRecords.map(record => [
+      const tableData = filteredRecords.map(record => [
         record.name,
         formatDate(record.loginTime),
         formatDate(record.logoutTime),
@@ -631,7 +661,7 @@ export default function Home() {
         return;
       }
 
-      const worksheet = XLSX.utils.json_to_sheet(displayRecords.map(record => ({
+      const worksheet = XLSX.utils.json_to_sheet(filteredRecords.map(record => ({
         'Name': record.name,
         'Login Time': formatDate(record.loginTime),
         'Logout Time': formatDate(record.logoutTime),
@@ -744,82 +774,67 @@ export default function Home() {
       </div>
 
       {/* Stats Cards */}
-      <StatsCards
+      <SectionCards
         records={records}
         currentSessionId={currentSessionId}
         userName={userName}
       />
 
       <div style={{ marginTop: '40px' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h2>Attendance Records</h2>
-            <Dropdown
-              trigger={
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export Data
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              }
-            >
-              <DropdownItem onClick={exportToCSV}>
-                <span className="mr-2">📄</span> Export as CSV
-              </DropdownItem>
-              <DropdownItem onClick={exportToExcel}>
-                <span className="mr-2">📊</span> Export as Excel
-              </DropdownItem>
-              <DropdownItem onClick={exportToPDF}>
-                <span className="mr-2">📑</span> Export as PDF
-              </DropdownItem>
-            </Dropdown>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <Table2 className="h-5 w-5 text-muted-foreground" />
+              Attendance Records
+            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={rangeFilter} onValueChange={(value) => setRangeFilter(value as typeof rangeFilter)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last7">Last 7 days</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="last3">Last 3 Months</SelectItem>
+                </SelectContent>
+              </Select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                    <FileDown className="h-4 w-4" />
+                    Export Data
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={exportToCSV}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToExcel}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToPDF}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </div>
 
-        {displayRecords.length === 0 ? (
-          <p>No records found</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f2f2f2' }}>
-                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Login Time</th>
-                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Logout Time</th>
-                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Duration</th>
-                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayRecords.map((record) => (
-                  <tr
-                    key={record.id}
-                    style={{
-                      borderBottom: '1px solid #ddd',
-                      backgroundColor: record.id === currentSessionId ? '#e8f5e9' : 'transparent'
-                    }}
-                  >
-                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(record.loginTime)}</td>
-                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(record.logoutTime)}</td>
-                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                      {calculateDuration(record.loginTime, record.logoutTime)}
-                    </td>
-                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                      {getStatus(record.loginTime, record.logoutTime).map((status, idx) => (
-                        <StatusBadge key={idx} status={status} />
-                      ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          <AttendanceDataTable
+            data={filteredRecords}
+            currentSessionId={currentSessionId}
+            formatDate={formatDate}
+            calculateDuration={calculateDuration}
+            renderStatus={(record) =>
+              getStatus(record.loginTime, record.logoutTime).map((status, idx) => (
+                <StatusBadge key={idx} status={status} />
+              ))
+            }
+          />
+        </div>
       </div>
     </>
   );
