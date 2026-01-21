@@ -8,14 +8,14 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import data from "@/app/dashboard/data.json"
 
 export default function Page() {
-  const noop = () => {}
+  const noop = () => { }
 
   return (
     <SidebarProvider>
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader
-          title="Dashboard"
+          breadcrumbs={[{ label: "Dashboard", href: "/" }]}
           user={null}
           onLogout={noop}
           onChangePassword={noop}
@@ -24,7 +24,11 @@ export default function Page() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
+              <SectionCards
+                records={[]}
+                currentSessionId={null}
+                userName="Guest"
+              />
               <div className="px-4 lg:px-6">
                 <ChartAreaInteractive />
               </div>
