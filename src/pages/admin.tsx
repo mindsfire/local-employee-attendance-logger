@@ -10,6 +10,7 @@ import {
   useAuth
 } from '../contexts/AuthContext';
 import ConfirmationModal from '../components/ConfirmationModal';
+import AttendanceAudit from '../components/admin/AttendanceAudit';
 
 interface AttendanceLogJoin {
   id: string;
@@ -72,6 +73,7 @@ export default function AdminDashboard() {
   const [successModalMessage, setSuccessModalMessage] = useState('');
   const [formState, setFormState] = useState<EmployeeFormState>(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'employees' | 'audit'>('employees');
 
   // Alert System State
   const [alerts, setAlerts] = useState<AttendanceAlert[]>([]);
@@ -367,73 +369,101 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div>
-          {statusMessage && (
-            <div className={`mb-4 p-4 border rounded-md ${statusMessage.startsWith('Failed') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
-              <p className="text-sm">{statusMessage}</p>
-            </div>
-          )}
-
-
-
-          <div className="flex justify-between items-center p-4 border-b border-gray-200">
-            <button onClick={openCreateModal} className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
-              Add New Employee
+        {/* Tabs Navigation */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('employees')}
+              className={`${activeTab === 'employees'
+                ? 'border-emerald-500 text-emerald-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Employees
             </button>
             <button
-              onClick={handleDelete}
-              disabled={selectedEmails.length === 0}
-              className={`px-4 py-2 text-white rounded-md ${selectedEmails.length === 0 ? 'bg-gray-300' : 'bg-red-600 hover:bg-red-700'}`}
+              onClick={() => setActiveTab('audit')}
+              className={`${activeTab === 'audit'
+                ? 'border-emerald-500 text-emerald-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Remove Selected
+              Attendance Audit
             </button>
-          </div>
+          </nav>
+        </div>
 
-          <div className="overflow-x-auto">
-            <div className="min-w-[800px]">
-              <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between">
-                <label className="flex items-center">
-                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} className="rounded text-emerald-600" />
-                  <span className="ml-3 text-sm font-semibold uppercase">User</span>
-                </label>
-                <div className="flex space-x-8">
-                  <span className="w-40 text-center text-sm font-semibold uppercase">Email</span>
-                  <span className="w-32 text-center text-sm font-semibold uppercase">Role</span>
-                  <span className="w-32 text-center text-sm font-semibold uppercase">Joined</span>
-                  <span className="w-20 text-center text-sm font-semibold uppercase">Actions</span>
-                </div>
+        {activeTab === 'audit' ? (
+          <AttendanceAudit employees={employees} />
+        ) : (
+          <div>
+            {statusMessage && (
+              <div className={`mb-4 p-4 border rounded-md ${statusMessage.startsWith('Failed') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
+                <p className="text-sm">{statusMessage}</p>
               </div>
+            )}
 
-              <div className="divide-y divide-gray-200">
-                {employees.map(account => (
-                  <div key={account.email || account.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                    <label className="flex items-center flex-1">
-                      <input
-                        type="checkbox"
-                        checked={!!account.email && selectedEmails.includes(account.email)}
-                        onChange={() => account.email && toggleSelection(account.email)}
-                        className="rounded text-emerald-600"
-                      />
-                      <div className="ml-4">
-                        <div className="font-medium text-gray-900">{account.name}</div>
-                      </div>
-                    </label>
-                    <div className="flex space-x-8 items-center">
-                      <span className="w-40 text-center text-sm text-gray-500 truncate" title={account.email}>{account.email}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-32 text-center ${account.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100'}`}>
-                        {account.role}
-                      </span>
-                      <span className="w-32 text-center text-sm text-gray-500">{formatDate(account.joiningDate || '')}</span>
-                      <div className="w-20 text-center">
-                        <button onClick={() => openEditModal(account)} className="text-emerald-600 hover:text-emerald-900 text-sm font-medium">Edit</button>
+
+
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <button onClick={openCreateModal} className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">
+                Add New Employee
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={selectedEmails.length === 0}
+                className={`px-4 py-2 text-white rounded-md ${selectedEmails.length === 0 ? 'bg-gray-300' : 'bg-red-600 hover:bg-red-700'}`}
+              >
+                Remove Selected
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[800px]">
+                <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between">
+                  <label className="flex items-center">
+                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} className="rounded text-emerald-600" />
+                    <span className="ml-3 text-sm font-semibold uppercase">User</span>
+                  </label>
+                  <div className="flex space-x-8">
+                    <span className="w-40 text-center text-sm font-semibold uppercase">Email</span>
+                    <span className="w-32 text-center text-sm font-semibold uppercase">Role</span>
+                    <span className="w-32 text-center text-sm font-semibold uppercase">Joined</span>
+                    <span className="w-20 text-center text-sm font-semibold uppercase">Actions</span>
+                  </div>
+                </div>
+
+                <div className="divide-y divide-gray-200">
+                  {employees.map(account => (
+                    <div key={account.email || account.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                      <label className="flex items-center flex-1">
+                        <input
+                          type="checkbox"
+                          checked={!!account.email && selectedEmails.includes(account.email)}
+                          onChange={() => account.email && toggleSelection(account.email)}
+                          className="rounded text-emerald-600"
+                        />
+                        <div className="ml-4">
+                          <div className="font-medium text-gray-900">{account.name}</div>
+                        </div>
+                      </label>
+                      <div className="flex space-x-8 items-center">
+                        <span className="w-40 text-center text-sm text-gray-500 truncate" title={account.email}>{account.email}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-32 text-center ${account.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100'}`}>
+                          {account.role}
+                        </span>
+                        <span className="w-32 text-center text-sm text-gray-500">{formatDate(account.joiningDate || '')}</span>
+                        <div className="w-20 text-center">
+                          <button onClick={() => openEditModal(account)} className="text-emerald-600 hover:text-emerald-900 text-sm font-medium">Edit</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {isModalOpen && (
