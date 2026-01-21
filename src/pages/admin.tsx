@@ -80,8 +80,6 @@ export default function AdminDashboard() {
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
-
-
   const loadEmployees = useCallback(async () => {
     try {
       const accounts = await getAllAccounts();
