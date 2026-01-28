@@ -303,10 +303,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setRequiresPasswordChange(false);
         }
-      } catch (error) {
-        console.error('onAuthStateChange error:', error);
       } finally {
         setLoading(false);
+      }
+
+      // Handle password recovery event
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('AuthContext: Password recovery mode detected, redirecting...');
+        window.location.href = '/reset-password';
       }
     });
 
