@@ -96,7 +96,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     path: '/',
                     maxAge: 300, // 5 minutes
                     httpOnly: false,
-                    sameSite: 'lax'
+                    sameSite: 'lax',
+                    secure: process.env.NODE_ENV === 'production'
                 })
             ]);
         }

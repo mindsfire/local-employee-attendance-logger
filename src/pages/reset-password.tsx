@@ -106,17 +106,24 @@ export default function ResetPassword() {
             }
         });
 
-        // 3. Fallback: if after 8 seconds we still aren't ready, and we aren't in success state, redirect
+        // 3. Fallback: if after 12 seconds we still aren't ready, and we aren't in success state, redirect
         const timeout = setTimeout(() => {
             if (!isReady && !isSuccess && mounted) {
                 console.error('[Reset Password] No session found after timeout.');
+                console.log('[Reset Password] Debug info:', {
+                    isReady,
+                    isSuccess,
+                    isRecoveryFlow,
+                    cookie: getCookie('password_recovery'),
+                    url: typeof window !== 'undefined' ? window.location.href : 'N/A'
+                });
                 if (isRecoveryFlow) {
                     router.replace('/login?error=Reset link expired. Please request a new password reset.');
                 } else {
                     router.replace('/login?error=Invalid or expired reset link. Please try again.');
                 }
             }
-        }, 8000); // Increased timeout for recovery flows
+        }, 12000); // Increased timeout for slower connections on Vercel
 
         return () => {
             mounted = false;

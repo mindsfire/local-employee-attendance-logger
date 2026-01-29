@@ -309,8 +309,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('AuthContext: Password recovery mode detected, redirecting...');
-        window.location.href = '/reset-password';
+        console.log('AuthContext: Password recovery mode detected');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/reset-password') {
+          console.log('AuthContext: Redirecting to /reset-password');
+          window.location.href = '/reset-password';
+        }
       }
     });
 
