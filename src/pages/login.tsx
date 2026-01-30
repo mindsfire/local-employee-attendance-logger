@@ -87,6 +87,8 @@ export default function Login() {
     }
   };
 
+  const emailValue = watch('email');
+
   const onForgotPassword = async () => {
     const email = (emailValue || '').trim();
 
@@ -101,16 +103,17 @@ export default function Login() {
       setIsResetting(true);
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=/reset-password`,
       });
 
       if (error) {
-        console.log(error);
-        setAuthError(error.message || 'Unable to send reset email. Please try again.');
+        console.error('Supabase Reset Password Error:', error);
+        setAuthError(`Email Error: ${error.message} (Code: ${error.status || 'unknown'})`);
         return;
       }
 
-      setResetMessage('If an account exists for this email, a password reset link has been sent.');
+      setResetMessage('Password reset link sent! Redirecting...');
+      router.push(`/forgot-password-confirmation?email=${encodeURIComponent(email)}`);
     } catch (err) {
       console.error('Forgot password error:', err);
       setAuthError('Unable to send reset email. Please try again.');
@@ -118,8 +121,6 @@ export default function Login() {
       setIsResetting(false);
     }
   };
-
-  const emailValue = watch('email');
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
